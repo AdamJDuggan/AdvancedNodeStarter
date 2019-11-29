@@ -14,8 +14,7 @@ module.exports = app => {
   });
 
   app.get('/api/blogs', requireLogin, async (req, res) => {
-    const blogs = await Blog.find({ _user: req.user.id });
-
+    const blogs = await Blog.find({ _user: req.user.id })
     res.send(blogs);
   });
 
@@ -36,3 +35,21 @@ module.exports = app => {
     }
   });
 };
+
+// query.exec = () => {
+// }
+// //override query.exec to see if this query has already been executed
+// // and if it has return the result right away 
+// client.get('query key')
+// if(result){return result}
+// // otherwise issue the query as normal 
+// const result = runTheOriginalExecFunction() 
+// // then save that value in redis 
+// client.set('query set', result)
+// return result 
+
+
+// // Cache values never expire- built in tools auto timeout
+// const query = Person 
+
+
