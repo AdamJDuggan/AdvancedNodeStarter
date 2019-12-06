@@ -4,26 +4,28 @@ const util = require('util')
 const redisUrl = 'redis://127.0.0.1:6379'
 
 const client = redis.createClient(redisUrl)
-client.get = util.promisify(client.get)
+client.hget = util.promisify(client.hget)
 
 // get a ref to the existing default function which gets executed anytime we do a query search 
 const exec = mongoose.Query.prototype.exec;
-
-mongoose.Query.prototype.cache = function () {
+// Default options obect to be empty if not passed. Options will be top level way of sorting caches
+mongoose.Query.prototype.cache = function (options = {}) {
     //this is equal to the query instance 
     this.useCache = true
+    // Hash key will be out top level property
+    this.hashKey = JSON.stringify(options.key || '')
     return this
 }
 
-// Arrow function messes around with this 
+// Arrow function messes around with this by firing immediatly 
 mongoose.Query.prototype.exec = async function () {
     // check to see if useCahce has been attached to the 
     if (!this.useCache) { return exec.apply(this, arguments) }
     // This adds the collection to the user id
     const key = JSON.stringify(Object.assign({}, this.getQuery(), { colletion: this.mongooseCollection.name }))
 
-    // See if we have a value for key in Redis
-    const cacheValue = await client.get(key)
+    // See if we have a value for key in Redis. Hget instead of get because we are using higher level property  to sort by user
+    const cacheValue = await client.hget(this.hashKey)
     // If we do, return that 
     if (cacheValue) {
         console.log('came back from cache')
@@ -43,8 +45,17 @@ mongoose.Query.prototype.exec = async function () {
     }
     // Otherwise, issue the query and store the result in Redis 
     const result = await exec.apply(this, arguments)
-    client.set(key, JSON.stringify(result))
+    client.hset(this.hashKey, JSON.stringify(result), 'EX', 10)
     console.log('result ', result)
     return result
+}
+
+//sole function is to delete data nested on particular has key 
+// Created as object in case we want to add more functions later
+module.exports = {
+    // We can pass clearHash anywhere in app now
+    clearHash(hashKey) {
+        client.del(JSON.stringify(hashKey))
+    }
 }
 
